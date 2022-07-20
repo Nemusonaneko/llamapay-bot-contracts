@@ -23,6 +23,7 @@ contract LlamaPayBot is BoringBatchable {
 
     function scheduleWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _frequency) external {
         bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec);
+        require(owners[id] == address(0), "event already has owner");
         owners[id] = msg.sender;
         emit WithdrawScheduled(_llamaPay, _from, _to, _amountPerSec, _frequency);
     }
