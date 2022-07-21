@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: AGPL-3.0-only
 
-import "./BoringBatchable.sol";
+import "./forks/ReentrancyGuard.sol";
 
 pragma solidity ^0.8.0;
 
@@ -12,9 +12,7 @@ interface Payer {
     function getWithdrawable(uint _id) external view returns (uint withdrawable);
 }
 
-// NEED TO HANDLE: Reverts, Payer Balances, Cancelled Streams, Stuck TxsI p
-
-contract LlamaPayV2Bot is BoringBatchable {
+contract LlamaPayV2Bot is ReentrancyGuard {
 
     address public bot = address(0);
     address public llama = address(0);
@@ -69,10 +67,7 @@ contract LlamaPayV2Bot is BoringBatchable {
         emit WithdrawExecuted(_payer, _id);
     }
 
-    function deposit(address _payer) external payable {
-        require(msg.value > 0, "need to send ether");
-        (bool sent,) = address(this).call{value: msg.value}("");
-        require(sent, "failed to send ether");
+    function deposit(address _payer) external payable nonReentrant {
         balances[_payer] += msg.value;
     }
 
@@ -80,29 +75,33 @@ contract LlamaPayV2Bot is BoringBatchable {
         address owner = Payer(_payer).owner();
         require(msg.sender == owner);
         uint toSend = balances[_payer];
-        balances[_payer] -= toSend;
+        balances[_payer] = 0;
         (bool sent,) = owner.call{value: toSend}("");
         require(sent, "failed to send ether");
     }
 
-    function executeTransactions(bytes[] calldata calls, address _payer) external {
+    function executeTransactions(bytes[][] calldata _calls, address[] calldata _owners) external {
         require(msg.sender == bot, "not bot");
         uint i;
-        uint len = calls.length;
-        uint startGas = gasleft();
-        for (i = 0; i < len; ++i) {
-            bytes calldata call = calls[i];
-            (bool success,) = address(this).delegatecall(call);
-            // dunno if worth it tbh
-            if (!success) {
-                emit ExecuteFailed(_payer, call);
+        uint ownerLen = _owners.length;
+        for (i = 0; i < ownerLen; ++i) {
+            uint j;
+            uint callLen = _calls[i].length;
+            uint startGas = gasleft();
+            address owner = _owners[i];
+            for (j = 0; j < callLen; ++j) {
+                bytes calldata call = _calls[i][j];
+                (bool success,) = address(this).delegatecall(call);
+                if (!success) {
+                    emit ExecuteFailed(owner, call);
+                }
             }
+            uint gasUsed = (startGas - gasleft()) + 21000;
+            uint totalSpent = gasUsed * tx.gasprice;
+            balances[owner] -= totalSpent;
+            (bool sent, ) = bot.call{value: totalSpent}("");
+            require(sent, "failed to send ether to bot");
         }
-        uint gasUsed = (startGas - gasleft()) + 21000;
-        uint totalSpent = gasUsed * tx.gasprice;
-        balances[_payer] -= totalSpent;
-        (bool sent, ) = bot.call{value: totalSpent}("");
-        require(sent, "failed to send ether to bot");
     }
 
     function changeBot(address _newBot) external {
