@@ -1,7 +1,6 @@
 # Compiler files
 cache/
 out/
-.vscode
 .env
 
 # Ignores development broadcast logs

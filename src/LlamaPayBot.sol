@@ -8,28 +8,27 @@ interface LlamaPay {
     function withdraw(address from, address to, uint216 amountPerSec) external;
 }
 
-
 contract LlamaPayBot is BoringBatchable {
 
     address public bot = address(0);
     address public llama = address(0);
 
-    event WithdrawScheduled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 frequency);
+    event WithdrawScheduled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
     event WithdrawCancelled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec);
     event ExecuteFailed(address indexed payer, bytes data);
 
     mapping(address => uint) public balances;
     mapping(bytes32 => address) public owners;
 
-    function scheduleWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _frequency) external {
-        bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec);
+    function scheduleWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency) external {
+        bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec, _frequency);
         require(owners[id] == address(0), "event already has owner");
         owners[id] = msg.sender;
-        emit WithdrawScheduled(_llamaPay, _from, _to, _amountPerSec, _frequency);
+        emit WithdrawScheduled(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
     }
 
-    function cancelWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec) external {
-        bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec);
+    function cancelWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _frequency) external {
+        bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec, _frequency);
         require(msg.sender == owners[id], "not owner of event");
         owners[id] = address(0);
         emit WithdrawCancelled(_llamaPay, _from, _to, _amountPerSec);
@@ -78,8 +77,8 @@ contract LlamaPayBot is BoringBatchable {
         bot = _newBot;
     }
 
-    function getWithdrawId(address _llamaPay, address _from, address _to, uint216 _amountPerSec) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_llamaPay, _from, _to, _amountPerSec));
+    function getWithdrawId(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _frequency) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_llamaPay, _from, _to, _amountPerSec, _frequency));
     }
 
 }
