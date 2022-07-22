@@ -16,6 +16,7 @@ contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
 
     event WithdrawScheduled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
     event WithdrawCancelled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
+    event WithdrawExecuted(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
     event ExecuteFailed(address indexed payer, bytes data);
 
     mapping(address => uint) public balances;
@@ -32,12 +33,13 @@ contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
         bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency, msg.sender);
         require(msg.sender == owners[id], "not owner of event");
         owners[id] = address(0);
-        emit WithdrawScheduled(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
+        emit WithdrawCancelled(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
     }
 
-    function executeWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec) external {
+    function executeWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency) external {
         require(msg.sender == bot, "not bot");
         LlamaPay(_llamaPay).withdraw(_from, _to, _amountPerSec);
+        emit WithdrawExecuted(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
     }
 
     function deposit() external payable nonReentrant {
