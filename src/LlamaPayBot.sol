@@ -14,39 +14,40 @@ contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
     address public bot = 0x9632c0578650F9d0e2581D6034A866bAa016efAA;
     address public llama = 0x9632c0578650F9d0e2581D6034A866bAa016efAA;
 
-    event WithdrawScheduled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
-    event WithdrawCancelled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
-    event WithdrawExecuted(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
-    event ExecuteFailed(address indexed payer, bytes data);
+    event WithdrawScheduled(address owner, address llamaPay, address from, address to, uint216 amountPerSec, uint40 starts, uint40 frequency, bytes32 id);
+    event WithdrawCancelled(address owner, address llamaPay, address from, address to, uint216 amountPerSec, uint40 starts, uint40 frequency, bytes32 id);
+    event WithdrawExecuted(address owner, address llamaPay, address from, address to, uint216 amountPerSec, uint40 starts, uint40 frequency, bytes32 id);
+    event ExecuteFailed(address owner, bytes data);
 
     mapping(address => uint) public balances;
     mapping(bytes32 => address) public owners;
 
     function scheduleWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency) external {
-        bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency, msg.sender);
+        bytes32 id = getWithdrawId(msg.sender, _llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
         require(owners[id] == address(0), "event already has owner");
         owners[id] = msg.sender;
-        emit WithdrawScheduled(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
+        emit WithdrawScheduled(msg.sender, _llamaPay, _from, _to, _amountPerSec, _starts, _frequency, id);
     }
 
     function cancelWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency) external {
-        bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency, msg.sender);
+        bytes32 id = getWithdrawId(msg.sender, _llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
         require(msg.sender == owners[id], "not owner of event");
         owners[id] = address(0);
-        emit WithdrawCancelled(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
+        emit WithdrawCancelled(msg.sender,_llamaPay, _from, _to, _amountPerSec, _starts, _frequency, id);
     }
 
-    function executeWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency) external {
+    function executeWithdraw(address _owner, address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency) external {
         require(msg.sender == bot, "not bot");
+        bytes32 id = getWithdrawId(msg.sender, _llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
         LlamaPay(_llamaPay).withdraw(_from, _to, _amountPerSec);
-        emit WithdrawExecuted(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
+        emit WithdrawExecuted(_owner, _llamaPay, _from, _to, _amountPerSec, _starts, _frequency, id);
     }
 
     function deposit() external payable nonReentrant {
         balances[msg.sender] += msg.value;
     }
 
-    function refund() external payable {
+    function refund() external {
         uint toSend = balances[msg.sender];
         balances[msg.sender] = 0;
         (bool sent,) = msg.sender.call{value: toSend}("");
@@ -77,8 +78,8 @@ contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
         bot = _newBot;
     }
 
-    function getWithdrawId(address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency, address _owner) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency, _owner));
+    function getWithdrawId(address _owner, address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_owner, _llamaPay, _from, _to, _amountPerSec, _starts, _frequency));
     }
 
 }
