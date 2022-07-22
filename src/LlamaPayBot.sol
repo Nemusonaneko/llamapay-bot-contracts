@@ -11,11 +11,11 @@ interface LlamaPay {
 
 contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
 
-    address public bot = address(0);
-    address public llama = address(0);
+    address public bot = 0x9632c0578650F9d0e2581D6034A866bAa016efAA;
+    address public llama = 0x9632c0578650F9d0e2581D6034A866bAa016efAA;
 
     event WithdrawScheduled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
-    event WithdrawCancelled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec);
+    event WithdrawCancelled(address indexed llamaPay, address indexed from, address indexed to, uint216 amountPerSec, uint40 starts, uint40 frequency);
     event ExecuteFailed(address indexed payer, bytes data);
 
     mapping(address => uint) public balances;
@@ -32,7 +32,7 @@ contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
         bytes32 id = getWithdrawId(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency, msg.sender);
         require(msg.sender == owners[id], "not owner of event");
         owners[id] = address(0);
-        emit WithdrawCancelled(_llamaPay, _from, _to, _amountPerSec);
+        emit WithdrawScheduled(_llamaPay, _from, _to, _amountPerSec, _starts, _frequency);
     }
 
     function executeWithdraw(address _llamaPay, address _from, address _to, uint216 _amountPerSec) external {
