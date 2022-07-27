@@ -13,6 +13,7 @@ contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
 
     address public bot = 0x9632c0578650F9d0e2581D6034A866bAa016efAA;
     address public llama = 0x9632c0578650F9d0e2581D6034A866bAa016efAA;
+    address public newLlama = 0x9632c0578650F9d0e2581D6034A866bAa016efAA;
 
     event WithdrawScheduled(address owner, address llamaPay, address from, address to, uint216 amountPerSec, uint40 starts, uint40 frequency, bytes32 id);
     event WithdrawCancelled(address owner, address llamaPay, address from, address to, uint216 amountPerSec, uint40 starts, uint40 frequency, bytes32 id);
@@ -66,7 +67,7 @@ contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
                 emit ExecuteFailed(_owner, call);
             }
         }
-        uint gasUsed = (startGas - gasleft()) + 21000;
+        uint gasUsed = (startGas - gasleft()) + 50000;
         uint totalSpent = gasUsed * tx.gasprice;
         balances[_owner] -= totalSpent;
         (bool sent, ) = bot.call{value: totalSpent}("");
@@ -76,6 +77,16 @@ contract LlamaPayBot is ReentrancyGuard, BoringBatchable {
     function changeBot(address _newBot) external {
         require(msg.sender == llama, "not llama");
         bot = _newBot;
+    }
+
+    function changeLlama(address _newLlama) external {
+        require(msg.sender == llama, "not llama");
+        newLlama = _newLlama;
+    }
+
+    function confirmNewLlama() external {
+        require(msg.sender == newLlama, "not new llama");
+        llama = newLlama;
     }
 
     function getWithdrawId(address _owner, address _llamaPay, address _from, address _to, uint216 _amountPerSec, uint40 _starts, uint40 _frequency) public pure returns (bytes32) {
